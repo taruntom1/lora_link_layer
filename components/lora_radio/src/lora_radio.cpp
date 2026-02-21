@@ -55,8 +55,9 @@ StaticQueue_t LoraRadio::s_normalQueueState;
 
 NeighborEntry LoraRadio::s_neighbors[CONFIG_LORA_MAX_NEIGHBORS];
 
-LoraRadio*          LoraRadio::s_instance    = nullptr;
-volatile bool       LoraRadio::s_taskRunning = false;
+LoraRadio*          LoraRadio::s_instance        = nullptr;
+volatile bool       LoraRadio::s_taskRunning     = false;
+TaskHandle_t        LoraRadio::s_runningTaskHandle = nullptr;
 
 // ===========================================================================
 // Cast helper (keeps RadioLib headers out of lora_radio.hpp)
@@ -206,7 +207,14 @@ esp_err_t LoraRadio::_initCommon(IRadioBackend* backend)
     // instant (s_taskRunning starts false) but protects the rare case
     // where Unity longjmps past a test-fixture destructor, leaving the
     // previous task alive when the next test re-initialises the radio.
+    //
+    // If a task is still alive (e.g., stuck in TX_WAIT or SLEEPING after
+    // a longjmp), signal it to exit before waiting, otherwise it may
+    // block portMAX_DELAY with nothing left to wake it.
     // ------------------------------------------------------------------
+    if (s_taskRunning && s_runningTaskHandle) {
+        xTaskNotify(s_runningTaskHandle, NOTIFY_STOP, eSetBits);
+    }
     while (s_taskRunning) { vTaskDelay(pdMS_TO_TICKS(10)); }
 
     // ------------------------------------------------------------------
@@ -365,22 +373,28 @@ size_t LoraRadio::getNeighbors(NeighborEntry* out, size_t maxCount) const
 
 void IRAM_ATTR LoraRadio::dio0Isr()
 {
-    BaseType_t higherPrioTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(s_instance->_taskHandle,
-                       NOTIFY_DIO0,
-                       eSetBits,
-                       &higherPrioTaskWoken);
-    portYIELD_FROM_ISR(higherPrioTaskWoken);
+    if (!s_instance || !s_instance->_taskHandle) return;
+    if (xPortInIsrContext()) {
+        BaseType_t x = pdFALSE;
+        xTaskNotifyFromISR(s_instance->_taskHandle, NOTIFY_DIO0, eSetBits, &x);
+        portYIELD_FROM_ISR(x);
+    } else {
+        // Called from task context (e.g., mock in unit tests) — use task-safe API.
+        xTaskNotify(s_instance->_taskHandle, NOTIFY_DIO0, eSetBits);
+    }
 }
 
 void IRAM_ATTR LoraRadio::dio1Isr()
 {
-    BaseType_t higherPrioTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(s_instance->_taskHandle,
-                       NOTIFY_DIO1,
-                       eSetBits,
-                       &higherPrioTaskWoken);
-    portYIELD_FROM_ISR(higherPrioTaskWoken);
+    if (!s_instance || !s_instance->_taskHandle) return;
+    if (xPortInIsrContext()) {
+        BaseType_t x = pdFALSE;
+        xTaskNotifyFromISR(s_instance->_taskHandle, NOTIFY_DIO1, eSetBits, &x);
+        portYIELD_FROM_ISR(x);
+    } else {
+        // Called from task context (e.g., mock in unit tests) — use task-safe API.
+        xTaskNotify(s_instance->_taskHandle, NOTIFY_DIO1, eSetBits);
+    }
 }
 
 // ===========================================================================
@@ -389,9 +403,12 @@ void IRAM_ATTR LoraRadio::dio1Isr()
 
 void LoraRadio::taskEntryStatic(void* arg)
 {
-    s_taskRunning = true;
-    static_cast<LoraRadio*>(arg)->taskLoop();
-    s_taskRunning = false;
+    LoraRadio* self = static_cast<LoraRadio*>(arg);
+    s_taskRunning      = true;
+    s_runningTaskHandle = self->_taskHandle;
+    self->taskLoop();
+    s_runningTaskHandle = nullptr;
+    s_taskRunning       = false;
     vTaskDelete(nullptr);
 }
 

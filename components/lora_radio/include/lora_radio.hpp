@@ -298,6 +298,11 @@ private:
     // Set to true at task entry, cleared to false before vTaskDelete.
     static volatile bool    s_taskRunning;
 
+    // Handle of the currently running task, held in a static so that
+    // _initCommon() can send NOTIFY_STOP to a stuck task (e.g., one
+    // abandoned by a longjmp in a failed unit test) before waiting.
+    static TaskHandle_t     s_runningTaskHandle;
+
     // Application-layer receive callback
     RxCallback _rxCb = nullptr;
 
