@@ -1,0 +1,8 @@
+## IDF Component Manager manifest for main (app entry point)
+## RadioLib is now declared as a dependency in components/lora_radio/idf_component.yml
+
+dependencies:
+  ## Ensure we target a recent enough ESP-IDF
+  idf:
+    version: ">=5.0.0"
+

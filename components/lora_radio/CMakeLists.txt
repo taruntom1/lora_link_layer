@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "src/esp_hal_s3.cpp"
+        "src/lora_radio.cpp"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        esp_driver_spi
+        driver
+        freertos
+        esp_timer
+        log
+)

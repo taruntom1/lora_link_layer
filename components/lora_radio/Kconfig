@@ -1,0 +1,195 @@
+menu "LoRa Radio"
+
+    config LORA_SPI_HOST
+        int "SPI Host (1=SPI1, 2=SPI2, 3=SPI3)"
+        default 2
+        range 1 3
+        help
+            SPI peripheral to use. SPI2_HOST=2, SPI3_HOST=3.
+            SPI1 is reserved for flash on most boards.
+
+    config LORA_PIN_SCK
+        int "SPI SCK GPIO pin"
+        default -1
+        help
+            GPIO number for the SPI clock line.
+
+    config LORA_PIN_MISO
+        int "SPI MISO GPIO pin"
+        default -1
+        help
+            GPIO number for the SPI MISO (Master In Slave Out) line.
+
+    config LORA_PIN_MOSI
+        int "SPI MOSI GPIO pin"
+        default -1
+        help
+            GPIO number for the SPI MOSI (Master Out Slave In) line.
+
+    config LORA_PIN_NSS
+        int "SX1278 NSS (CS) GPIO pin"
+        default -1
+        help
+            GPIO number for the SX1278 chip-select (NSS) pin.
+            Toggled by software via RadioLib.
+
+    config LORA_PIN_RST
+        int "SX1278 RST GPIO pin"
+        default -1
+        help
+            GPIO number for the SX1278 hardware reset pin.
+
+    config LORA_PIN_DIO0
+        int "SX1278 DIO0 GPIO pin"
+        default -1
+        help
+            GPIO number for DIO0. Fires on TX/RX done and CAD no-activity.
+            Must be an RTC-capable GPIO for edge-triggered interrupts.
+
+    config LORA_PIN_DIO1
+        int "SX1278 DIO1 GPIO pin"
+        default -1
+        help
+            GPIO number for DIO1. Fires when CAD detects a LoRa preamble
+            (channel busy). Required for collision-avoidance (CAD) support.
+
+    config LORA_FREQUENCY_HZ
+        int "Centre frequency in Hz"
+        default 433000000
+        help
+            LoRa carrier frequency in Hz. E.g. 433000000 (433 MHz).
+
+    config LORA_BANDWIDTH_HZ
+        int "LoRa bandwidth in Hz"
+        default 125000
+        help
+            LoRa signal bandwidth in Hz. Typical values: 7800, 10400, 15600,
+            20800, 31250, 41700, 62500, 125000, 250000.
+
+    config LORA_SPREADING_FACTOR
+        int "LoRa spreading factor"
+        default 9
+        range 6 12
+        help
+            LoRa spreading factor (SF6–SF12). Higher SF = longer range but
+            lower data rate and longer time-on-air.
+
+    config LORA_CODING_RATE
+        int "LoRa coding rate denominator (4/x)"
+        default 7
+        range 5 8
+        help
+            LoRa coding rate denominator. e.g. 7 means 4/7.
+
+    config LORA_TX_POWER_DBM
+        int "Transmit power in dBm"
+        default 17
+        range 2 20
+        help
+            TX power in dBm. SX1278 maximum is 20 dBm on PA_BOOST.
+
+    config LORA_SYNC_WORD
+        hex "LoRa sync word"
+        default 0x12
+        help
+            1-byte LoRa sync word. 0x12 = private network (RadioLib default).
+            Use 0x34 for LoRaWAN public network.
+
+    config LORA_NODE_ID
+        hex "This node's V2V identifier"
+        default 0x0001
+        help
+            16-bit identifier for this vehicle node. Used as packet source ID
+            and ACK destination matching.
+
+    config LORA_TASK_STACK_SIZE
+        int "Radio task stack size in bytes"
+        default 4096
+        help
+            Stack depth (bytes) for the lora_radio background FreeRTOS task.
+            Increase if you see stack overflow panics.
+
+    config LORA_TASK_PRIORITY
+        int "Radio task FreeRTOS priority"
+        default 5
+        range 1 24
+        help
+            FreeRTOS task priority for the radio state-machine task.
+            Should be above the main application priority.
+
+    config LORA_TX_QUEUE_DEPTH
+        int "Normal TX queue depth (packets)"
+        default 4
+        range 1 16
+        help
+            Maximum number of normal-priority packets that can be queued
+            before send() returns ESP_ERR_NO_MEM.
+
+    config LORA_MAX_NEIGHBORS
+        int "Neighbor table capacity"
+        default 16
+        range 4 64
+        help
+            Maximum number of distinct V2V nodes tracked in the RSSI/SNR
+            neighbor table.
+
+    config LORA_MAX_RETRIES
+        int "ACK retransmit attempts"
+        default 3
+        range 1 10
+        help
+            Number of times a packet tagged ACK_REQUEST will be retransmitted
+            before being dropped when no ACK is received.
+
+    config LORA_ACK_TIMEOUT_MS
+        int "ACK wait timeout in milliseconds"
+        default 500
+        range 50 5000
+        help
+            Time (ms) the radio task waits for an ACK before declaring a
+            retransmit needed.
+
+    config LORA_SLEEP_IDLE_MS
+        int "Idle timeout before modem sleep in milliseconds"
+        default 3000
+        range 100 30000
+        help
+            If no TX is queued and no RX arrives within this window, the radio
+            enters modem sleep to save power.
+
+    config LORA_CAD_RETRIES
+        int "CAD backoff retries before dropping TX"
+        default 3
+        range 1 10
+        help
+            How many times to retry CAD with random backoff before abandoning
+            a packet when the channel is perpetually detected as busy.
+
+    config LORA_ENABLE_TEST_SEAM
+        bool "Enable test seam (unit testing only)"
+        default n
+        help
+            Enables additional public methods used by the unit-test suite:
+            initForTest(), injectNeighborUpdate(), getState().
+            Must be disabled in production firmware — has no runtime cost
+            when disabled, but exposes internal state when enabled.
+
+    config LORA_HW_TEST_ENABLED
+        bool "Enable on-hardware integration tests"
+        default n
+        depends on LORA_ENABLE_TEST_SEAM
+        help
+            Compile and run tests that require two physical ESP32-S3 + SX1278
+            boards communicating over the air.  Requires real GPIO pins to be
+            configured (LORA_PIN_* settings) and LORA_HW_TEST_PEER_NODE_ID
+            to be set to the partner board's node ID.
+
+    config LORA_HW_TEST_PEER_NODE_ID
+        hex "Hardware test: peer node ID"
+        default 0x0002
+        depends on LORA_HW_TEST_ENABLED
+        help
+            16-bit node ID of the partner device used in on-hardware
+            integration tests.
+
+endmenu

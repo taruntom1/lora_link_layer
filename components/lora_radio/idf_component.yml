@@ -1,0 +1,4 @@
+dependencies:
+  jgromes/radiolib: ">=7.6.0"
+  idf:
+    version: ">=5.0.0"

@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------------------
+# sdkconfig.defaults — LoRa radio test project overrides
+# ---------------------------------------------------------------------------
+# These values are merged with the component Kconfig defaults.
+# They are tuned for fast, reliable test execution rather than production use.
+
+# Enable test seam: exposes initForTest(), injectNeighborUpdate(), getState()
+CONFIG_LORA_ENABLE_TEST_SEAM=y
+
+# Shorten timeouts so state-machine tests complete quickly
+CONFIG_LORA_ACK_TIMEOUT_MS=100
+CONFIG_LORA_SLEEP_IDLE_MS=200
+CONFIG_LORA_CAD_RETRIES=2
+CONFIG_LORA_MAX_RETRIES=2
+
+# Stack large enough for test runner + nested calls
+CONFIG_LORA_TASK_STACK_SIZE=6144
+
+# Radio task priority lower than the test task so the test task drives timing
+CONFIG_LORA_TASK_PRIORITY=4
+
+# Node ID used by the device-under-test in state-machine tests
+CONFIG_LORA_NODE_ID=0x0001
+
+# Hardware integration test: set the peer node ID and real GPIO pins here.
+# Leave pins at -1 to disable hardware integration tests.
+# CONFIG_LORA_PIN_SCK=12
+# CONFIG_LORA_PIN_MISO=13
+# CONFIG_LORA_PIN_MOSI=11
+# CONFIG_LORA_PIN_NSS=10
+# CONFIG_LORA_PIN_RST=9
+# CONFIG_LORA_PIN_DIO0=14
+CONFIG_LORA_PIN_DIO1=15

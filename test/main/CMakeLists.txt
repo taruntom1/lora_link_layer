@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "test_runner.cpp"
+        "test_packet_building.cpp"
+        "test_send_validation.cpp"
+        "test_neighbor_table.cpp"
+        "test_state_machine.cpp"
+        "test_hardware_integration.cpp"
+    INCLUDE_DIRS
+        "."
+        "mock"
+    REQUIRES
+        lora_radio
+        unity
+        freertos
+        esp_timer
+        log
+)
