@@ -1,0 +1,5 @@
+## IDF Component Manager manifest for lora_sender example
+
+dependencies:
+  idf:
+    version: ">=5.0.0"
