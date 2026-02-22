@@ -163,10 +163,10 @@ From the repository root:
 
     python -m pip install -r docs/requirements.txt
     doxygen docs/doxygen/Doxyfile
-    build-docs -t esp32s3 -l en build
+    build-docs --project-path docs -t esp32s3 -l en build
 
 Generated outputs:
 
 - Doxygen HTML: ``docs/doxygen/html/index.html``
 - Doxygen XML: ``docs/doxygen/xml``
-- Sphinx HTML: ``docs/_build/en/esp32s3/index.html``
+- Sphinx HTML: ``docs/_build/en/esp32s3/html/index.html``
