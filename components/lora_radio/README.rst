@@ -130,7 +130,7 @@ already transitively available.
 Usage Example
 -------------
 
-.. code-block:: c
+.. code-block:: cpp
 
     #include "lora_radio.hpp"
 
@@ -151,3 +151,22 @@ Usage Example
         const uint8_t msg[] = "hello";
         radio.send(0xFFFF, 0x01, msg, sizeof(msg) - 1);
     }
+
+Generating Documentation
+------------------------
+
+The project uses an ESP-IDF-style Sphinx + Doxygen pipeline.
+
+From the repository root:
+
+.. code-block:: bash
+
+    python -m pip install -r docs/requirements.txt
+    doxygen docs/doxygen/Doxyfile
+    build-docs -l en -t esp32s3 build
+
+Generated outputs:
+
+- Doxygen HTML: ``docs/doxygen/html/index.html``
+- Doxygen XML: ``docs/doxygen/xml``
+- Sphinx HTML: ``docs/_build/en/esp32s3/index.html``
