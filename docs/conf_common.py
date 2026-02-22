@@ -11,8 +11,13 @@ project_slug = "lora-link-layer"
 project_homepage = "https://github.com/taruntom1/lora_link_layer"
 
 idf_targets = ["esp32s3"]
+idf_target_title_dict = {
+    "esp32s3": "ESP32-S3",
+}
 
 languages = ["en"]
+
+pdf_file = ""
 
 html_context = {
     "github_user": github_user,

@@ -84,3 +84,5 @@ docs/doxygen/*
 
 # Sphinx generated documentation
 docs/_build/
+
+_build/
