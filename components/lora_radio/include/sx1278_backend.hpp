@@ -32,89 +32,89 @@ public:
     // IRadioBackend implementation — all calls forwarded to SX1278
     // ------------------------------------------------------------------
 
-    /// @brief Forwarded to SX1278::begin().
+    /// @copydoc IRadioBackend::begin(float, float, uint8_t, uint8_t, uint8_t, int8_t)
     int16_t begin(float freq, float bw, uint8_t sf, uint8_t cr,
                   uint8_t syncWord, int8_t power) override
     {
         return _radio->begin(freq, bw, sf, cr, syncWord, power);
     }
 
-    /// @brief Forwarded to SX1278::setDio0Action().
+    /// @copydoc IRadioBackend::setDio0Action(void (*)(void), uint32_t)
     void setDio0Action(void (*cb)(void), uint32_t dir) override
     {
         _radio->setDio0Action(cb, dir);
     }
 
-    /// @brief Forwarded to SX1278::clearDio0Action().
+    /// @copydoc IRadioBackend::clearDio0Action()
     void clearDio0Action() override
     {
         _radio->clearDio0Action();
     }
 
-    /// @brief Forwarded to SX1278::setDio1Action().
+    /// @copydoc IRadioBackend::setDio1Action(void (*)(void), uint32_t)
     void setDio1Action(void (*cb)(void), uint32_t dir) override
     {
         _radio->setDio1Action(cb, dir);
     }
 
-    /// @brief Forwarded to SX1278::clearDio1Action().
+    /// @copydoc IRadioBackend::clearDio1Action()
     void clearDio1Action() override
     {
         _radio->clearDio1Action();
     }
 
-    /// @brief Forwarded to SX1278::startChannelScan().
+    /// @copydoc IRadioBackend::startChannelScan()
     int16_t startChannelScan() override
     {
         return _radio->startChannelScan();
     }
 
-    /// @brief Forwarded to SX1278::getChannelScanResult().
+    /// @copydoc IRadioBackend::getChannelScanResult()
     int16_t getChannelScanResult() override
     {
         return _radio->getChannelScanResult();
     }
 
-    /// @brief Forwarded to SX1278::startTransmit().
+    /// @copydoc IRadioBackend::startTransmit(uint8_t*, size_t)
     int16_t startTransmit(uint8_t* data, size_t len) override
     {
         return _radio->startTransmit(data, len);
     }
 
-    /// @brief Forwarded to SX1278::finishTransmit().
+    /// @copydoc IRadioBackend::finishTransmit()
     int16_t finishTransmit() override
     {
         return _radio->finishTransmit();
     }
 
-    /// @brief Forwarded to SX1278::startReceive().
+    /// @copydoc IRadioBackend::startReceive()
     int16_t startReceive() override
     {
         return _radio->startReceive();
     }
 
-    /// @brief Forwarded to SX1278::getPacketLength().
+    /// @copydoc IRadioBackend::getPacketLength()
     size_t getPacketLength() override
     {
         return _radio->getPacketLength();
     }
 
-    /// @brief Forwarded to SX1278::readData().
+    /// @copydoc IRadioBackend::readData(uint8_t*, size_t)
     int16_t readData(uint8_t* data, size_t len) override
     {
         return _radio->readData(data, len);
     }
 
-    /// @brief Forwarded to SX1278::getRSSI().
+    /// @copydoc IRadioBackend::getRSSI()
     float getRSSI() override { return _radio->getRSSI(); }
 
-    /// @brief Forwarded to SX1278::getSNR().
+    /// @copydoc IRadioBackend::getSNR()
     float getSNR()  override { return _radio->getSNR();  }
 
-    /// @brief Forwarded to SX1278::sleep().
+    /// @copydoc IRadioBackend::sleep()
     int16_t sleep()   override { return _radio->sleep();   }
 
-    /// @brief Forwarded to SX1278::standby().
+    /// @copydoc IRadioBackend::standby()
     int16_t standby() override { return _radio->standby(); }
 
 private:
