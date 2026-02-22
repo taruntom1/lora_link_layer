@@ -13,7 +13,7 @@ From the repository root:
 ```bash
 python -m pip install -r docs/requirements.txt
 doxygen docs/doxygen/Doxyfile
-build-docs -l en -t esp32s3 build
+build-docs build -l en -t esp32s3
 ```
 
 Outputs:
