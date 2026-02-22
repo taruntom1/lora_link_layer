@@ -37,7 +37,7 @@ jobs:
         run: doxygen docs/doxygen/Doxyfile
 
       - name: Build Sphinx docs
-        run: build-docs build -l en -t esp32s3
+        run: build-docs -l en -t esp32s3 -- build
 
       - name: Check Doxygen warnings
         run: |

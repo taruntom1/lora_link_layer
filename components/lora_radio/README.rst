@@ -163,7 +163,7 @@ From the repository root:
 
     python -m pip install -r docs/requirements.txt
     doxygen docs/doxygen/Doxyfile
-    build-docs build -l en -t esp32s3
+    build-docs -l en -t esp32s3 -- build
 
 Generated outputs:
 
