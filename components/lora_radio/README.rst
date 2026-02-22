@@ -127,6 +127,26 @@ RadioLib (``jgromes/radiolib >= 7.6.0``) is declared in
 IDF Component Manager.  Do not add it to ``main/idf_component.yml``; it is
 already transitively available.
 
+ESP Component Registry
+----------------------
+
+This component is structured for direct upload to the ESP Component Registry.
+
+- Registry metadata (``version``, ``repository``, ``repository_info.path``,
+  and tags) is defined in ``components/lora_radio/idf_component.yml``.
+- Component examples are included under ``components/lora_radio/examples`` so
+  they are packaged with the uploaded component.
+- Example manifests use:
+
+  - ``taruntom1/lora_radio`` for registry resolution.
+  - ``override_path: ../../`` for local development before publishing.
+
+Typical upload command (run from ``components/lora_radio``):
+
+.. code-block:: bash
+
+    compote component upload --namespace taruntom1
+
 Usage Example
 -------------
 

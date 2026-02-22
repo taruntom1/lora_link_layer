@@ -1,0 +1,6 @@
+dependencies:
+  taruntom1/lora_radio:
+    version: "*"
+    override_path: "../../"
+  idf:
+    version: ">=5.0.0"
