@@ -37,7 +37,7 @@ jobs:
         run: doxygen docs/doxygen/Doxyfile
 
       - name: Build Sphinx docs
-        run: build-docs --project-path docs -t esp32s3 -l en build
+        run: build-docs --project-path docs --source-dir docs/en --doxyfile_dir . -t esp32s3 -l en build
 
       - name: Check Doxygen warnings
         run: |
@@ -52,7 +52,7 @@ jobs:
       - name: Upload docs artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_build/en/esp32s3/html
+          path: _build/en/esp32s3/html
 
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

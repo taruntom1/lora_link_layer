@@ -13,14 +13,14 @@ From the repository root:
 ```bash
 python -m pip install -r docs/requirements.txt
 doxygen docs/doxygen/Doxyfile
-build-docs --project-path docs -t esp32s3 -l en build
+build-docs --project-path docs --source-dir docs/en --doxyfile_dir . -t esp32s3 -l en build
 ```
 
 Outputs:
 
 - Doxygen HTML: `docs/doxygen/html/index.html`
 - Doxygen XML: `docs/doxygen/xml`
-- Sphinx HTML: `docs/_build/en/esp32s3/html/index.html`
+- Sphinx HTML: `_build/en/esp32s3/html/index.html`
 
 ## Warning policy
 
