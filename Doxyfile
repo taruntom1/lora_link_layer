@@ -1,0 +1,3 @@
+# Compatibility wrapper.
+# Preferred command: doxygen docs/doxygen/Doxyfile
+@INCLUDE = docs/doxygen/Doxyfile

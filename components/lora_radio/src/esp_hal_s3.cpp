@@ -1,11 +1,13 @@
-// ---------------------------------------------------------------------------
-// esp_hal_s3.cpp — RadioLib HAL implementation via ESP-IDF spi_master driver
-// ---------------------------------------------------------------------------
-// Replaces the upstream EspHal.h which uses bare-metal SPI register access
-// (spi_dev_t / DPORT_*) that only compiles on ESP32 classic.  This file uses
-// the portable spi_bus_initialize / spi_device_polling_transmit API and works
-// on ESP32-S3 (and every other ESP32 variant).
-// ---------------------------------------------------------------------------
+/**
+ * @file esp_hal_s3.cpp
+ * @brief RadioLib HAL implementation via the ESP-IDF spi_master driver.
+ *
+ * @details
+ * Replaces the upstream EspHal.h which uses bare-metal SPI register access
+ * (@c spi_dev_t / @c DPORT_*) that only compiles on ESP32 classic.  This file
+ * uses the portable @c spi_bus_initialize / @c spi_device_polling_transmit API
+ * and works on ESP32-S3 (and every other ESP32 variant).
+ */
 
 #include "esp_hal_s3.hpp"
 

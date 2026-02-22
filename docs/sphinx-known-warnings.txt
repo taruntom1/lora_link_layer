@@ -1,0 +1,2 @@
+# Add one warning regex per line when a warning is accepted temporarily.
+# Keep this file as small as possible.

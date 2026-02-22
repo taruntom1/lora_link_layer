@@ -76,3 +76,13 @@ Desktop.ini
 *.workspace # General workspace files, can be from various tools
 *.suo       # Visual Studio Solution User Options
 *.sln.docstates # Visual Studio
+test_build_log.txt
+
+# Doxygen generated documentation
+docs/doxygen/*
+!docs/doxygen/Doxyfile
+
+# Sphinx generated documentation
+docs/_build/
+
+_build/
