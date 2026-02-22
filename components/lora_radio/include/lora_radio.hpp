@@ -105,34 +105,34 @@ struct NeighborEntry {
  */
 struct LoraRadioConfig {
     // SPI bus
-    int  spiHost  = CONFIG_LORA_SPI_HOST;
-    int  pinSck   = CONFIG_LORA_PIN_SCK;
-    int  pinMiso  = CONFIG_LORA_PIN_MISO;
-    int  pinMosi  = CONFIG_LORA_PIN_MOSI;
+    int  spiHost  = CONFIG_LORA_SPI_HOST;  ///< ESP-IDF SPI host identifier (e.g. @c SPI2_HOST)
+    int  pinSck   = CONFIG_LORA_PIN_SCK;   ///< GPIO number for the SPI clock line
+    int  pinMiso  = CONFIG_LORA_PIN_MISO;  ///< GPIO number for the MISO line
+    int  pinMosi  = CONFIG_LORA_PIN_MOSI;  ///< GPIO number for the MOSI line
     // Radio control pins
-    int  pinNss   = CONFIG_LORA_PIN_NSS;
-    int  pinRst   = CONFIG_LORA_PIN_RST;
-    int  pinDio0  = CONFIG_LORA_PIN_DIO0;
-    int  pinDio1  = CONFIG_LORA_PIN_DIO1;
+    int  pinNss   = CONFIG_LORA_PIN_NSS;   ///< GPIO number for chip-select (NSS / CS)
+    int  pinRst   = CONFIG_LORA_PIN_RST;   ///< GPIO number for hardware reset
+    int  pinDio0  = CONFIG_LORA_PIN_DIO0;  ///< GPIO number for DIO0 interrupt (TX-done / RX-done / CAD-clear)
+    int  pinDio1  = CONFIG_LORA_PIN_DIO1;  ///< GPIO number for DIO1 interrupt (CAD-busy); use @c RADIO_PIN_NC if not connected
     // RF parameters
-    float   frequencyMHz    = CONFIG_LORA_FREQUENCY_HZ / 1e6f;
-    float   bandwidthKHz    = CONFIG_LORA_BANDWIDTH_HZ / 1e3f;
-    uint8_t spreadingFactor = CONFIG_LORA_SPREADING_FACTOR;
-    uint8_t codingRate      = CONFIG_LORA_CODING_RATE;
-    int8_t  txPowerDbm      = CONFIG_LORA_TX_POWER_DBM;
-    uint8_t syncWord        = CONFIG_LORA_SYNC_WORD;
+    float   frequencyMHz    = CONFIG_LORA_FREQUENCY_HZ / 1e6f;  ///< Centre frequency in MHz
+    float   bandwidthKHz    = CONFIG_LORA_BANDWIDTH_HZ / 1e3f;  ///< Signal bandwidth in kHz
+    uint8_t spreadingFactor = CONFIG_LORA_SPREADING_FACTOR;     ///< LoRa spreading factor (6–12)
+    uint8_t codingRate      = CONFIG_LORA_CODING_RATE;          ///< Coding-rate denominator (5–8, meaning 4/5 … 4/8)
+    int8_t  txPowerDbm      = CONFIG_LORA_TX_POWER_DBM;         ///< TX output power in dBm
+    uint8_t syncWord        = CONFIG_LORA_SYNC_WORD;            ///< 1-byte LoRa sync word (0x12 = private, 0x34 = LoRaWAN)
     // Node identity
-    uint16_t nodeId         = CONFIG_LORA_NODE_ID;
+    uint16_t nodeId         = CONFIG_LORA_NODE_ID;              ///< This node's 16-bit network identifier
     // FreeRTOS task knobs
-    uint32_t taskStackSize  = CONFIG_LORA_TASK_STACK_SIZE;
-    uint32_t taskPriority   = CONFIG_LORA_TASK_PRIORITY;
-    uint32_t txQueueDepth   = CONFIG_LORA_TX_QUEUE_DEPTH;
+    uint32_t taskStackSize  = CONFIG_LORA_TASK_STACK_SIZE;      ///< Radio task stack size in bytes
+    uint32_t taskPriority   = CONFIG_LORA_TASK_PRIORITY;        ///< Radio task FreeRTOS priority
+    uint32_t txQueueDepth   = CONFIG_LORA_TX_QUEUE_DEPTH;       ///< Depth of the transmit queue (in TxItem units)
     // Reliability knobs
-    uint32_t maxNeighbors   = CONFIG_LORA_MAX_NEIGHBORS;
-    uint32_t maxRetries     = CONFIG_LORA_MAX_RETRIES;
-    uint32_t ackTimeoutMs   = CONFIG_LORA_ACK_TIMEOUT_MS;
-    uint32_t sleepIdleMs    = CONFIG_LORA_SLEEP_IDLE_MS;
-    uint32_t cadRetries     = CONFIG_LORA_CAD_RETRIES;
+    uint32_t maxNeighbors   = CONFIG_LORA_MAX_NEIGHBORS;        ///< Maximum number of neighbour table entries
+    uint32_t maxRetries     = CONFIG_LORA_MAX_RETRIES;          ///< Maximum ACK retransmission attempts
+    uint32_t ackTimeoutMs   = CONFIG_LORA_ACK_TIMEOUT_MS;       ///< Timeout waiting for a link-layer ACK (ms)
+    uint32_t sleepIdleMs    = CONFIG_LORA_SLEEP_IDLE_MS;        ///< Idle time before entering modem sleep (ms)
+    uint32_t cadRetries     = CONFIG_LORA_CAD_RETRIES;          ///< Maximum CAD retries before dropping a packet
 };
 
 // ============================================================================
@@ -170,25 +170,49 @@ public:
     // Lifecycle
     // -----------------------------------------------------------------------
 
-    /// Initialise hardware (SPI, GPIO, RadioLib, FreeRTOS objects).
-    /// Must be called once from app_main before any send/receive operations.
+    /**
+     * @brief Initialise hardware (SPI, GPIO, RadioLib, FreeRTOS objects).
+     *
+     * Must be called once from @c app_main before any send or receive
+     * operations.  Calling this a second time is a no-op.
+     *
+     * @return
+     *    - ESP_OK on success
+     *    - ESP_FAIL if the radio modem could not be initialised
+     */
     esp_err_t init();
 
-    /// Gracefully shut down: stop task, put radio to sleep, free SPI bus.
+    /**
+     * @brief Gracefully shut down: stop the radio task, put the modem to
+     *        sleep, and free the SPI bus.
+     *
+     * Safe to call even if @c init() was never called or already failed.
+     */
     void deinit();
 
     // -----------------------------------------------------------------------
     // Transmit API  (thread-safe — can be called from any task)
     // -----------------------------------------------------------------------
 
-    /// Queue a packet for transmission.
-    /// @param dstId      Destination node ID (0xFFFF for broadcast)
-    /// @param msgType    Caller-defined message type byte (0x04 is reserved for ACK)
-    /// @param data       Payload bytes (copied into internal buffer)
-    /// @param len        Payload length  (max LORA_MAX_PAYLOAD bytes)
-    /// @param requestAck If true, the radio will wait for an ACK and
-    ///                   retransmit up to maxRetries times on timeout.
-    /// @return ESP_OK | ESP_ERR_INVALID_SIZE | ESP_ERR_NO_MEM (queue full)
+    /**
+     * @brief Queue a packet for transmission.
+     *
+     * The payload is copied into an internal buffer so the caller may free
+     * @p data immediately after this call returns.
+     *
+     * @param dstId      Destination node ID (0xFFFF for broadcast).
+     * @param msgType    Caller-defined message type byte (0x04 is reserved
+     *                   for link-layer ACK and must not be used by callers).
+     * @param data       Pointer to the payload bytes to transmit.
+     * @param len        Payload length in bytes (max @c LORA_MAX_PAYLOAD).
+     * @param requestAck If @c true the radio waits for an ACK and
+     *                   retransmits up to @c maxRetries times on timeout.
+     *
+     * @return
+     *    - ESP_OK on success
+     *    - ESP_ERR_INVALID_SIZE if @p len exceeds @c LORA_MAX_PAYLOAD
+     *    - ESP_ERR_NO_MEM if the transmit queue is full
+     */
     esp_err_t send(uint16_t        dstId,
                    uint8_t         msgType,
                    const uint8_t*  data,
@@ -207,8 +231,15 @@ public:
     // Neighbour table
     // -----------------------------------------------------------------------
 
-    /// Copy up to maxCount entries from the internal neighbour table into
-    /// @p out.  Returns the number of valid entries written.
+    /**
+     * @brief Copy valid entries from the internal neighbour table into @p out.
+     *
+     * @param out       Output buffer to receive neighbour entries.  Must be
+     *                  at least @p maxCount elements long.
+     * @param maxCount  Maximum number of entries to copy.
+     *
+     * @return Number of valid entries written to @p out.
+     */
     size_t getNeighbors(NeighborEntry* out, size_t maxCount) const;
 
     // -----------------------------------------------------------------------
