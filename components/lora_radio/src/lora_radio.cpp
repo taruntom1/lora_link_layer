@@ -1,22 +1,20 @@
-// ---------------------------------------------------------------------------
-// lora_radio.cpp — LoRa V2V radio state machine + FreeRTOS task
-// ---------------------------------------------------------------------------
-// Implementation notes:
-//
-//  • The concrete radio hardware is accessed exclusively through IRadioBackend.
-//    Production builds use Sx1278Backend (wrapping RadioLib SX1278).
-//    Test builds inject MockRadioBackend via initForTest().
-//
-//  • RadioLib objects (EspHal, Module, SX1278, Sx1278Backend) are heap-
-//    allocated exactly once inside init() and freed inside deinit().
-//    In test mode (initForTest), none of these are created.
-//
-//  • All FreeRTOS objects (task, queues) use static storage declared below.
-//    xTaskCreateStatic / xQueueCreateStatic never call pvPortMalloc.
-//
-//  • DIO0 and DIO1 ISRs contain only xTaskNotifyFromISR + portYIELD_FROM_ISR.
-//    Zero SPI transactions, zero blocking calls, zero logic in ISR context.
-// ---------------------------------------------------------------------------
+/**
+ * @file lora_radio.cpp
+ * @brief LoRa V2V radio state machine and FreeRTOS task implementation.
+ *
+ * @details
+ * Implementation notes:
+ *  - The concrete radio hardware is accessed exclusively through IRadioBackend.
+ *    Production builds use Sx1278Backend (wrapping RadioLib SX1278).
+ *    Test builds inject MockRadioBackend via initForTest().
+ *  - RadioLib objects (EspHal, Module, SX1278, Sx1278Backend) are heap-
+ *    allocated exactly once inside init() and freed inside deinit().
+ *    In test mode (initForTest), none of these are created.
+ *  - All FreeRTOS objects (task, queues) use static storage declared below.
+ *    xTaskCreateStatic / xQueueCreateStatic never call pvPortMalloc.
+ *  - DIO0 and DIO1 ISRs contain only xTaskNotifyFromISR + portYIELD_FROM_ISR.
+ *    Zero SPI transactions, zero blocking calls, zero logic in ISR context.
+ */
 
 // sx1278_backend.hpp brings in <RadioLib.h> for the production init() path.
 // The state-machine code (taskLoop, dispatchRx, etc.) never touches RadioLib

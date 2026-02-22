@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Doxyfile — Doxygen configuration for the lora_radio component
+# ---------------------------------------------------------------------------
+# Run from the repository root:  doxygen Doxyfile
+# Output is written to docs/doxygen/html/index.html
+# ---------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------
+# Project metadata
+#---------------------------------------------------------------------------
+PROJECT_NAME           = "LoRa Radio Component"
+PROJECT_BRIEF          = "LoRa V2V/V2X link-layer component for ESP32-S3 (ESP-IDF)"
+PROJECT_NUMBER         = "1.0"
+PROJECT_LOGO           =
+OUTPUT_DIRECTORY       = docs/doxygen
+
+#---------------------------------------------------------------------------
+# Input
+#---------------------------------------------------------------------------
+INPUT                  = components/lora_radio/include \
+                         components/lora_radio/src
+RECURSIVE              = NO
+FILE_PATTERNS          = *.cpp *.hpp *.h
+EXCLUDE_PATTERNS       =
+
+#---------------------------------------------------------------------------
+# Build / extraction options
+#---------------------------------------------------------------------------
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+CASE_SENSE_NAMES       = YES
+
+#---------------------------------------------------------------------------
+# Preprocessor — define symbols needed to parse all conditional blocks
+#---------------------------------------------------------------------------
+ENABLE_PREPROCESSING   = YES
+PREDEFINED             = CONFIG_LORA_ENABLE_TEST_SEAM=1 \
+                         CONFIG_LORA_TASK_STACK_SIZE=4096 \
+                         CONFIG_LORA_TX_QUEUE_DEPTH=4 \
+                         CONFIG_LORA_MAX_NEIGHBORS=16
+EXPAND_ONLY_PREDEF     = NO
+MACRO_EXPANSION        = YES
+
+#---------------------------------------------------------------------------
+# Warnings
+#---------------------------------------------------------------------------
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_LOGFILE           = docs/doxygen/doxygen_warnings.log
+
+#---------------------------------------------------------------------------
+# HTML output
+#---------------------------------------------------------------------------
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+
+#---------------------------------------------------------------------------
+# Disable formats we do not need
+#---------------------------------------------------------------------------
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+GENERATE_XML           = NO
+
+#---------------------------------------------------------------------------
+# Source browsing
+#---------------------------------------------------------------------------
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+
+#---------------------------------------------------------------------------
+# Dot / graphs (disabled — no graphviz dependency required)
+#---------------------------------------------------------------------------
+HAVE_DOT               = NO
+CLASS_DIAGRAMS         = YES

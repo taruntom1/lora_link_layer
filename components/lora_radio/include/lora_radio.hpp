@@ -1,31 +1,41 @@
 #pragma once
 
-// ---------------------------------------------------------------------------
-// lora_radio.hpp — LoRa Physical / Link Layer Component for ESP-IDF
-// ---------------------------------------------------------------------------
-// Architecture overview:
-//
-//  ┌─────────────────────────────────────────────────────────────────────┐
-//  │                        Caller (application)                         │
-//  │  LoraRadio::send() / setRxCallback()                               │
-//  └───────────────────────┬─────────────────────────────────────────────┘
-//                          │ thread-safe queue push + task notify
-//  ┌───────────────────────▼─────────────────────────────────────────────┐
-//  │              FreeRTOS Radio Task (taskLoop)                         │
-//  │  State machine: IDLE → CAD → TX_WAIT → WAIT_ACK → RX → SLEEPING   │
-//  │  All SPI work, IRadioBackend calls, ACK logic live here.            │
-//  └───────────────────────▲─────────────────────────────────────────────┘
-//                          │ xTaskNotifyFromISR (bitmask)
-//  ┌───────────────────────┴─────────────────────────────────────────────┐
-//  │  ISRs: dio0Isr / dio1Isr  (IRAM, zero SPI contact)                 │
-//  │  Only post a notification bit and yield — nothing else.             │
-//  └─────────────────────────────────────────────────────────────────────┘
-//
-// Dependency injection:
-//  The concrete radio hardware is abstracted behind IRadioBackend.
-//  Production builds use Sx1278Backend (wraps RadioLib SX1278).
-//  Test builds inject MockRadioBackend via initForTest().
-// ---------------------------------------------------------------------------
+/**
+ * @file lora_radio.hpp
+ * @brief LoRa Physical / Link Layer component public API for ESP-IDF.
+ *
+ * @details
+ * Provides a FreeRTOS-based LoRa radio driver with:
+ *  - Thread-safe transmit queue (LoraRadio::send())
+ *  - Automatic CAD (Channel Activity Detection) before every TX
+ *  - Optional ACK with configurable retransmission backoff
+ *  - Continuous receive with user-supplied callback (LoraRadio::setRxCallback())
+ *  - Neighbour RSSI/SNR table (LoraRadio::getNeighbors())
+ *  - Power-saving modem sleep when the channel is idle
+ *
+ * Architecture overview:
+ * @verbatim
+ *  ┌─────────────────────────────────────────────────────────────────────┐
+ *  │                        Caller (application)                         │
+ *  │  LoraRadio::send() / setRxCallback()                               │
+ *  └───────────────────────┬─────────────────────────────────────────────┘
+ *                          │ thread-safe queue push + task notify
+ *  ┌───────────────────────▼─────────────────────────────────────────────┐
+ *  │              FreeRTOS Radio Task (taskLoop)                         │
+ *  │  State machine: IDLE → CAD → TX_WAIT → WAIT_ACK → RX → SLEEPING   │
+ *  │  All SPI work, IRadioBackend calls, ACK logic live here.            │
+ *  └───────────────────────▲─────────────────────────────────────────────┘
+ *                          │ xTaskNotifyFromISR (bitmask)
+ *  ┌───────────────────────┴─────────────────────────────────────────────┐
+ *  │  ISRs: dio0Isr / dio1Isr  (IRAM, zero SPI contact)                 │
+ *  │  Only post a notification bit and yield — nothing else.             │
+ *  └─────────────────────────────────────────────────────────────────────┘
+ * @endverbatim
+ *
+ * The concrete radio hardware is abstracted behind IRadioBackend.
+ * Production builds use Sx1278Backend (wraps RadioLib SX1278).
+ * Test builds inject MockRadioBackend via initForTest().
+ */
 
 #include <cstdint>
 #include <cstddef>
@@ -42,16 +52,18 @@
 // Sits at the front of every LoRa frame transmitted by this component.
 // ============================================================================
 
-/// Flags carried in PacketHeader::flags
+/// @brief Bitmask flags carried in PacketHeader::flags.
 enum PacketFlags : uint8_t {
     FLAG_ACK_REQUEST   = 0x01,  ///< Sender wants an ACK back
     FLAG_IS_RETRANSMIT = 0x02,  ///< This is a retried copy of an earlier packet
 };
 
-/// Maximum application payload bytes in one LoRa frame.
+/// @brief Maximum application payload bytes in one LoRa frame.
 /// SX1278 max is 255; we reserve 8 bytes for the header.
 static constexpr size_t LORA_MAX_PAYLOAD = 247;
 
+/// @brief Wire-format packet header placed at the start of every LoRa frame.
+/// @note  The struct is packed (no padding) so that sizeof(PacketHeader) == 8.
 #pragma pack(push, 1)
 struct PacketHeader {
     uint16_t srcId;      ///< Source node ID
@@ -69,7 +81,7 @@ static constexpr size_t PACKET_HEADER_SIZE = sizeof(PacketHeader); // = 8
 // Neighbor table
 // ============================================================================
 
-/// Per-node entry updated on every received packet
+/// @brief Per-node entry updated on every received packet.
 struct NeighborEntry {
     uint16_t nodeId;       ///< Source node ID
     float    rssi;         ///< Last measured RSSI (dBm)
@@ -83,6 +95,14 @@ struct NeighborEntry {
 // All fields default to values from Kconfig so callers can use {} for a fully
 // board-independent config or override individual pins at runtime.
 // ============================================================================
+
+/**
+ * @brief Runtime configuration for LoraRadio.
+ *
+ * All fields carry Kconfig defaults, so @c LoraRadioConfig{} is a valid,
+ * board-independent configuration.  Override individual members to adapt to
+ * a specific board without touching @c sdkconfig.
+ */
 struct LoraRadioConfig {
     // SPI bus
     int  spiHost  = CONFIG_LORA_SPI_HOST;
@@ -119,17 +139,28 @@ struct LoraRadioConfig {
 // LoraRadio class
 // ============================================================================
 
+/**
+ * @brief FreeRTOS-based LoRa link-layer driver.
+ *
+ * A single instance manages one SX1278 radio.  The public API is thread-safe;
+ * all SPI work and state-machine logic run inside the dedicated radio task.
+ *
+ * @note Only one LoraRadio instance may exist at a time because the ISR
+ *       trampolines (dio0Isr / dio1Isr) use a static singleton pointer.
+ */
 class EspHal;  // forward-declare to avoid pulling all RadioLib headers in here
 
 class LoraRadio {
 public:
-    /// Callback invoked (from the radio task) on every received packet.
+    /// @brief Callback invoked (from the radio task) on every received packet.
     /// Must be safe to call from a non-ISR FreeRTOS task context.
     using RxCallback = void (*)(const PacketHeader& header,
                                 const uint8_t*      payload,
                                 float               rssi,
                                 float               snr);
 
+    /// @brief Construct a LoraRadio with the given (or default Kconfig) configuration.
+    /// @param cfg  Radio and task configuration.  Defaults to Kconfig values.
     explicit LoraRadio(const LoraRadioConfig& cfg = LoraRadioConfig{});
 
     /// RAII destructor — calls deinit() automatically.
@@ -167,6 +198,9 @@ public:
     // -----------------------------------------------------------------------
     // Receive
     // -----------------------------------------------------------------------
+
+    /// @brief Register a callback that is invoked for every received packet.
+    /// @param cb  Function to call.  Pass @c nullptr to disable.
     void setRxCallback(RxCallback cb);
 
     // -----------------------------------------------------------------------
