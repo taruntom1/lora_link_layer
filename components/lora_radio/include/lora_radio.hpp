@@ -9,6 +9,8 @@
  *  - Thread-safe transmit queue (LoraRadio::send())
  *  - Automatic CAD (Channel Activity Detection) before every TX
  *  - Optional ACK with configurable retransmission backoff
+ *  - ACK result callback (LoraRadio::setAckCallback()) notifies whether an
+ *    acknowledged send succeeded or exhausted all retries
  *  - Continuous receive with user-supplied callback (LoraRadio::setRxCallback())
  *  - Neighbour RSSI/SNR table (LoraRadio::getNeighbors())
  *  - Power-saving modem sleep when the channel is idle
@@ -17,7 +19,7 @@
  * @verbatim
  *  ┌─────────────────────────────────────────────────────────────────────┐
  *  │                        Caller (application)                         │
- *  │  LoraRadio::send() / setRxCallback()                               │
+ *  │  LoraRadio::send() / setRxCallback() / setAckCallback()            │
  *  └───────────────────────┬─────────────────────────────────────────────┘
  *                          │ thread-safe queue push + task notify
  *  ┌───────────────────────▼─────────────────────────────────────────────┐
@@ -159,6 +161,17 @@ public:
                                 float               rssi,
                                 float               snr);
 
+    /// @brief Callback invoked (from the radio task) when an acknowledged send
+    /// completes — either successfully or after exhausting all retries.
+    ///
+    /// @param seqNum  Sequence number of the original transmitted packet.
+    /// @param success @c true  if a matching link-layer ACK was received;
+    ///                @c false if the maximum retransmission count was reached
+    ///                         without receiving an ACK.
+    ///
+    /// Must be safe to call from a non-ISR FreeRTOS task context.
+    using AckCallback = void (*)(uint8_t seqNum, bool success);
+
     /// @brief Construct a LoraRadio with the given (or default Kconfig) configuration.
     /// @param cfg  Radio and task configuration.  Defaults to Kconfig values.
     explicit LoraRadio(const LoraRadioConfig& cfg = LoraRadioConfig{});
@@ -226,6 +239,11 @@ public:
     /// @brief Register a callback that is invoked for every received packet.
     /// @param cb  Function to call.  Pass @c nullptr to disable.
     void setRxCallback(RxCallback cb);
+
+    /// @brief Register a callback that is invoked when an acknowledged send
+    /// completes (ACK received or retries exhausted).
+    /// @param cb  Function to call.  Pass @c nullptr to disable.
+    void setAckCallback(AckCallback cb);
 
     // -----------------------------------------------------------------------
     // Neighbour table
@@ -370,6 +388,9 @@ private:
 
     // Application-layer receive callback
     RxCallback _rxCb = nullptr;
+
+    // Application-layer ACK result callback
+    AckCallback _ackCb = nullptr;
 
     // Rolling TX sequence counter
     uint8_t  _seqNum = 0;

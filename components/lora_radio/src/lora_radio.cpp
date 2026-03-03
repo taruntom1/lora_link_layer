@@ -354,6 +354,11 @@ void LoraRadio::setRxCallback(RxCallback cb)
     _rxCb = cb;
 }
 
+void LoraRadio::setAckCallback(AckCallback cb)
+{
+    _ackCb = cb;
+}
+
 size_t LoraRadio::getNeighbors(NeighborEntry* out, size_t maxCount) const
 {
     size_t written = 0;
@@ -685,6 +690,9 @@ void LoraRadio::taskLoop()
                             updateNeighbor(rxHdr->srcId, rssi, snr);
                             _waitingAck   = false;
                             _hasPendingTx = false;
+                            if (_ackCb) {
+                                _ackCb(rxHdr->seqNum, true);
+                            }
                             _state = State::IDLE;
                         } else {
                             dispatchRx(buf, pktLen, rssi, snr);
@@ -708,8 +716,12 @@ void LoraRadio::taskLoop()
                 } else {
                     ESP_LOGW(TAG, "ACK: max retries (%lu) exhausted, dropping",
                              _cfg.maxRetries);
+                    uint8_t failedSeq = _pendingAck.buf[offsetof(PacketHeader, seqNum)];
                     _waitingAck   = false;
                     _hasPendingTx = false;
+                    if (_ackCb) {
+                        _ackCb(failedSeq, false);
+                    }
                     _state = State::IDLE;
                 }
             }
