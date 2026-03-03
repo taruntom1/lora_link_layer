@@ -363,6 +363,111 @@ static void test_ack_max_retries_exhausted_drops_packet(void)
     );
 }
 
+// --- ACK callback ---
+
+static void test_ack_callback_fired_on_success(void)
+{
+    SmFixture f;
+    f.init();
+    TEST_ASSERT_TRUE(waitForCount(f.mock.startReceiveCount, 1));
+
+    static volatile bool  ackCallbackFired = false;
+    static volatile bool  ackCallbackResult = false;
+    static volatile uint8_t ackCallbackSeq = 0xFF;
+    ackCallbackFired  = false;
+    ackCallbackResult = false;
+    ackCallbackSeq    = 0xFF;
+
+    f.radio.setAckCallback([](uint8_t seqNum, bool success) {
+        ackCallbackSeq    = seqNum;
+        ackCallbackResult = success;
+        ackCallbackFired  = true;
+    });
+
+    TEST_ASSERT_EQUAL(ESP_OK, f.radio.send(0x0002, 0x01, nullptr, 0, /*ack=*/true));
+
+    // Drive through CAD → TX
+    driveCadClear(f.mock, 0, 0);
+
+    // TX done → WAIT_ACK
+    f.mock.fireDio0();
+    TEST_ASSERT_TRUE(waitForState(f.radio, LoraRadio::State::WAIT_ACK, 600));
+
+    // Retrieve the seqNum that was transmitted
+    const PacketHeader* txHdr = reinterpret_cast<const PacketHeader*>(f.mock.lastTxBuf);
+    uint8_t txSeq = txHdr->seqNum;
+
+    // Build a matching ACK frame
+    std::memset(f.mock.rxBuf, 0, sizeof(f.mock.rxBuf));
+    PacketHeader* ack = reinterpret_cast<PacketHeader*>(f.mock.rxBuf);
+    ack->srcId      = 0x0002;
+    ack->dstId      = CONFIG_LORA_NODE_ID;
+    ack->seqNum     = txSeq;
+    ack->msgType    = 0x04;  // MSGTYPE_ACK
+    ack->flags      = 0;
+    ack->payloadLen = 0;
+    f.mock.rxLen    = PACKET_HEADER_SIZE;
+
+    vTaskDelay(pdMS_TO_TICKS(15));
+    f.mock.fireDio0();  // inject ACK arrival
+
+    // Wait for ACK callback
+    uint32_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(500);
+    while (!ackCallbackFired && xTaskGetTickCount() < deadline) {
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(ackCallbackFired,  "ACK callback was not fired on success");
+    TEST_ASSERT_TRUE_MESSAGE(ackCallbackResult, "ACK callback should report success=true");
+    TEST_ASSERT_EQUAL_HEX8(txSeq, ackCallbackSeq);
+}
+
+static void test_ack_callback_fired_on_failure(void)
+{
+    SmFixture f;
+    f.init();
+    TEST_ASSERT_TRUE(waitForCount(f.mock.startReceiveCount, 1));
+
+    static volatile bool  ackCallbackFired = false;
+    static volatile bool  ackCallbackResult = true;
+    ackCallbackFired  = false;
+    ackCallbackResult = true;
+
+    f.radio.setAckCallback([](uint8_t /*seqNum*/, bool success) {
+        ackCallbackResult = success;
+        ackCallbackFired  = true;
+    });
+
+    TEST_ASSERT_EQUAL(ESP_OK, f.radio.send(0x0002, 0x01, nullptr, 0, /*ack=*/true));
+
+    driveCadClear(f.mock, 0, 0);
+    f.mock.fireDio0();  // TX done → WAIT_ACK
+    TEST_ASSERT_TRUE(waitForState(f.radio, LoraRadio::State::WAIT_ACK, 600));
+
+    // Exhaust all retries by not sending any ACK
+    for (int r = 0; r < (int)CONFIG_LORA_MAX_RETRIES; ++r) {
+        int prevCAD = f.mock.startChannelScanCount;
+        int prevTX  = f.mock.startTransmitCount;
+        TEST_ASSERT_TRUE(waitForCount(f.mock.startChannelScanCount, prevCAD + 1, 1000));
+        vTaskDelay(pdMS_TO_TICKS(15));
+        f.mock.fireDio0();  // CAD clear
+        TEST_ASSERT_TRUE(waitForCount(f.mock.startTransmitCount, prevTX + 1, 600));
+        f.mock.fireDio0();  // TX done → back in WAIT_ACK
+        if (r < (int)CONFIG_LORA_MAX_RETRIES - 1) {
+            TEST_ASSERT_TRUE(waitForState(f.radio, LoraRadio::State::WAIT_ACK, 600));
+        }
+    }
+
+    // Wait for ACK callback to fire with success=false
+    uint32_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(1200);
+    while (!ackCallbackFired && xTaskGetTickCount() < deadline) {
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(ackCallbackFired,   "ACK callback was not fired on failure");
+    TEST_ASSERT_FALSE_MESSAGE(ackCallbackResult, "ACK callback should report success=false");
+}
+
 // --- RX dispatch ---
 
 static void test_rx_callback_fired_for_unicast_to_this_node(void)
@@ -586,6 +691,8 @@ void run_test_state_machine(void)
     RUN_TEST(test_correct_ack_received_resolves_wait_ack);
     RUN_TEST(test_ack_timeout_causes_retransmit_with_flag);
     RUN_TEST(test_ack_max_retries_exhausted_drops_packet);
+    RUN_TEST(test_ack_callback_fired_on_success);
+    RUN_TEST(test_ack_callback_fired_on_failure);
     RUN_TEST(test_rx_callback_fired_for_unicast_to_this_node);
     RUN_TEST(test_rx_callback_not_fired_for_foreign_node);
     RUN_TEST(test_rx_callback_fired_for_broadcast);

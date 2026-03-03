@@ -19,6 +19,8 @@ Features
   transmitting, with configurable retry-and-backoff.
 - **Optional ACK with retransmission** – set ``requestAck = true`` in :cpp:func:`LoraRadio::send`
   to enable link-layer acknowledged delivery with configurable timeout and retry count.
+- **ACK result callback** – register a callback with :cpp:func:`LoraRadio::setAckCallback` to be
+  notified whether an acknowledged send completed successfully or exhausted all retries.
 - **Continuous receive with callback** – register a callback with
   :cpp:func:`LoraRadio::setRxCallback` to be notified of every received packet.
 - **Neighbour RSSI/SNR table** – the component maintains a per-node signal-quality table updated on
@@ -35,7 +37,7 @@ Architecture
 
     ┌─────────────────────────────────────────────────────────────────────┐
     │                        Caller (application)                         │
-    │  LoraRadio::send() / setRxCallback()                               │
+    │  LoraRadio::send() / setRxCallback() / setAckCallback()            │
     └───────────────────────┬─────────────────────────────────────────────┘
                             │ thread-safe queue push + task notify
     ┌───────────────────────▼─────────────────────────────────────────────┐
@@ -54,7 +56,8 @@ State-machine states:
 - **IDLE** – decides whether to dequeue a TX item (→ CAD) or enter receive mode (→ RX).
 - **CAD** – performs Channel Activity Detection before each transmission.
 - **TX_WAIT** – waits for DIO0 (TX-done interrupt) after starting a transmission.
-- **WAIT_ACK** – waits for a link-layer ACK after an acknowledged transmission.
+- **WAIT_ACK** – waits for a link-layer ACK after an acknowledged transmission; fires the ACK
+  callback on success or when retries are exhausted.
 - **RX** – radio in continuous receive; fires the RX callback on each packet.
 - **SLEEPING** – radio in low-power modem sleep; woken by a transmit request.
 
@@ -162,14 +165,25 @@ Usage Example
         ESP_LOGI("app", "RX from 0x%04X  RSSI=%.1f SNR=%.1f", hdr.srcId, rssi, snr);
     }
 
+    static void ack_handler(uint8_t seqNum, bool success)
+    {
+        if (success) {
+            ESP_LOGI("app", "ACK received for seq=%u", seqNum);
+        } else {
+            ESP_LOGW("app", "No ACK for seq=%u (retries exhausted)", seqNum);
+        }
+    }
+
     void app_main(void)
     {
-        LoraRadio radio;                 // uses Kconfig defaults
+        LoraRadio radio;                   // uses Kconfig defaults
         radio.setRxCallback(rx_handler);
+        radio.setAckCallback(ack_handler);
         ESP_ERROR_CHECK(radio.init());
 
         const uint8_t msg[] = "hello";
-        radio.send(0xFFFF, 0x01, msg, sizeof(msg) - 1);
+        // requestAck=true: ACK result is reported via ack_handler
+        radio.send(0xFFFF, 0x01, msg, sizeof(msg) - 1, /*requestAck=*/true);
     }
 
 Generating Documentation

@@ -7,6 +7,7 @@ LoRa link-layer component for ESP-IDF using SX1278 (RadioLib backend).
 - FreeRTOS task-based radio state machine (`IDLE -> CAD -> TX_WAIT -> WAIT_ACK -> RX -> SLEEPING`)
 - Channel Activity Detection (CAD) before TX
 - Optional link-layer ACK with retries and timeout
+- ACK result callback (`setAckCallback`) — notified when an acknowledged send succeeds or exhausts retries
 - Broadcast and unicast packet handling
 - Neighbor RSSI/SNR tracking
 - Test seam support (`initForTest`, `getState`, `injectNeighborUpdate`) behind `CONFIG_LORA_ENABLE_TEST_SEAM`
