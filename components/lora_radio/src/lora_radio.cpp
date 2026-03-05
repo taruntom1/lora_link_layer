@@ -24,6 +24,20 @@
 #include "lora_radio.hpp"
 #include "esp_hal_s3.hpp"
 
+#include "sdkconfig.h"
+#if CONFIG_LORA_LOG_LEVEL_NONE
+#define LOG_LOCAL_LEVEL ESP_LOG_NONE
+#elif CONFIG_LORA_LOG_LEVEL_ERROR
+#define LOG_LOCAL_LEVEL ESP_LOG_ERROR
+#elif CONFIG_LORA_LOG_LEVEL_WARN
+#define LOG_LOCAL_LEVEL ESP_LOG_WARN
+#elif CONFIG_LORA_LOG_LEVEL_INFO
+#define LOG_LOCAL_LEVEL ESP_LOG_INFO
+#elif CONFIG_LORA_LOG_LEVEL_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#else
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#endif
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
