@@ -1,6 +1,4 @@
 dependencies:
-  taruntom1/lora_radio:
-    version: "*"
-    override_path: "../../"
   idf:
-    version: ">=5.0.0"
+    version: '>=5.0.0'
+  taruntom1/lora_link_layer: ^0.1.4

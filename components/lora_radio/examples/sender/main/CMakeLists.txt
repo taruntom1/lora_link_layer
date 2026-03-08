@@ -2,6 +2,6 @@ idf_component_register(
     SRCS
         "main.cpp"
     REQUIRES
-        lora_radio
+        lora_link_layer
         freertos
 )

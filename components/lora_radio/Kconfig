@@ -1,5 +1,31 @@
 menu "LoRa Radio"
 
+    choice LORA_LOG_LEVEL
+        prompt "LoRa Radio component log level"
+        default LORA_LOG_LEVEL_INFO
+        help
+            Select runtime log verbosity for the lora_radio component
+            (tag: "LoraRadio").
+
+        config LORA_LOG_LEVEL_NONE
+            bool "None"
+
+        config LORA_LOG_LEVEL_ERROR
+            bool "Error"
+
+        config LORA_LOG_LEVEL_WARN
+            bool "Warn"
+
+        config LORA_LOG_LEVEL_INFO
+            bool "Info"
+
+        config LORA_LOG_LEVEL_DEBUG
+            bool "Debug"
+
+        config LORA_LOG_LEVEL_VERBOSE
+            bool "Verbose"
+    endchoice
+
     config LORA_SPI_HOST
         int "SPI Host (1=SPI1, 2=SPI2, 3=SPI3)"
         default 2

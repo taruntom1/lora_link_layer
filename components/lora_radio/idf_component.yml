@@ -1,17 +1,17 @@
-version: "0.1.0"
+version: "0.1.4"
 description: "LoRa link-layer component for ESP32 using RadioLib SX1278"
 license: "Apache-2.0"
 url: "https://github.com/taruntom1/lora_link_layer"
 repository: "https://github.com/taruntom1/lora_link_layer.git"
 repository_info:
-  path: "components/lora_radio"
+  path: "components/lora_link_layer"
 documentation: "https://taruntom1.github.io/lora_link_layer/overview.html"
 issues: "https://github.com/taruntom1/lora_link_layer/issues"
 tags:
   - lora
   - sx1278
   - radio
-  - esp32
+  - esp32-s3
   - link-layer
 targets:
   - esp32s3
