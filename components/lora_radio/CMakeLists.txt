@@ -1,7 +1,10 @@
 idf_component_register(
     SRCS
+        "src/ack_tracker.cpp"
         "src/esp_hal_s3.cpp"
         "src/lora_radio.cpp"
+        "src/lora_state_handlers.cpp"
+        "src/neighbor_table.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES

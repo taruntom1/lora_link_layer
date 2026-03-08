@@ -41,115 +41,17 @@
 
 #include <cstdint>
 #include <cstddef>
-
-#include "sdkconfig.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
+
+#include "ack_tracker.hpp"
+#include "lora_config.hpp"
+#include "lora_packet.hpp"
+#include "neighbor_table.hpp"
 #include "radio_backend.hpp"
 
-// ============================================================================
-// Wire-format packet header (packed — no padding)
-// Sits at the front of every LoRa frame transmitted by this component.
-// ============================================================================
-
-/// @brief Bitmask flags carried in PacketHeader::flags.
-enum PacketFlags : uint8_t {
-    FLAG_ACK_REQUEST   = 0x01,  ///< Sender wants an ACK back
-    FLAG_IS_RETRANSMIT = 0x02,  ///< This is a retried copy of an earlier packet
-};
-
-/// @brief Maximum application payload bytes in one LoRa frame.
-/// SX1278 max is 255; we reserve 8 bytes for the header.
-static constexpr size_t LORA_MAX_PAYLOAD = 247;
-
-/// @brief Wire-format packet header placed at the start of every LoRa frame.
-/// @note  The struct is packed (no padding) so that sizeof(PacketHeader) == 8.
-#pragma pack(push, 1)
-struct PacketHeader {
-    uint16_t srcId;      ///< Source node ID
-    uint16_t dstId;      ///< Destination node ID (0xFFFF = broadcast)
-    uint8_t  seqNum;     ///< Rolling sequence number (ACK matching / dedup)
-    uint8_t  msgType;    ///< Opaque message type — defined by the caller; 0x04 is reserved for link-layer ACK
-    uint8_t  flags;      ///< Bitmask of PacketFlags
-    uint8_t  payloadLen; ///< Number of payload bytes that follow this header
-};
-#pragma pack(pop)
-
-static constexpr size_t PACKET_HEADER_SIZE = sizeof(PacketHeader); // = 8
-
-// ============================================================================
-// Neighbor table
-// ============================================================================
-
-/// @brief Per-node entry updated on every received packet.
-struct NeighborEntry {
-    uint16_t nodeId;       ///< Source node ID
-    float    rssi;         ///< Last measured RSSI (dBm)
-    float    snr;          ///< Last measured SNR (dB)
-    uint32_t lastSeenMs;   ///< esp_timer millis when packet was received
-    bool     valid;        ///< true if the slot holds a real entry
-};
-
-// ============================================================================
-// Configuration struct
-// All fields default to values from Kconfig so callers can use {} for a fully
-// board-independent config or override individual pins at runtime.
-// ============================================================================
-
-/**
- * @brief Runtime configuration for LoraRadio.
- *
- * All fields carry Kconfig defaults, so @c LoraRadioConfig{} is a valid,
- * board-independent configuration.  Override individual members to adapt to
- * a specific board without touching @c sdkconfig.
- */
-struct LoraRadioConfig {
-    // SPI bus
-    int  spiHost  = CONFIG_LORA_SPI_HOST;  ///< ESP-IDF SPI host identifier (e.g. @c SPI2_HOST)
-    int  pinSck   = CONFIG_LORA_PIN_SCK;   ///< GPIO number for the SPI clock line
-    int  pinMiso  = CONFIG_LORA_PIN_MISO;  ///< GPIO number for the MISO line
-    int  pinMosi  = CONFIG_LORA_PIN_MOSI;  ///< GPIO number for the MOSI line
-    // Radio control pins
-    int  pinNss   = CONFIG_LORA_PIN_NSS;   ///< GPIO number for chip-select (NSS / CS)
-    int  pinRst   = CONFIG_LORA_PIN_RST;   ///< GPIO number for hardware reset
-    int  pinDio0  = CONFIG_LORA_PIN_DIO0;  ///< GPIO number for DIO0 interrupt (TX-done / RX-done / CAD-clear)
-    int  pinDio1  = CONFIG_LORA_PIN_DIO1;  ///< GPIO number for DIO1 interrupt (CAD-busy); use @c RADIO_PIN_NC if not connected
-    // RF parameters
-    float   frequencyMHz    = CONFIG_LORA_FREQUENCY_HZ / 1e6f;  ///< Centre frequency in MHz
-    float   bandwidthKHz    = CONFIG_LORA_BANDWIDTH_HZ / 1e3f;  ///< Signal bandwidth in kHz
-    uint8_t spreadingFactor = CONFIG_LORA_SPREADING_FACTOR;     ///< LoRa spreading factor (6–12)
-    uint8_t codingRate      = CONFIG_LORA_CODING_RATE;          ///< Coding-rate denominator (5–8, meaning 4/5 … 4/8)
-    int8_t  txPowerDbm      = CONFIG_LORA_TX_POWER_DBM;         ///< TX output power in dBm
-    uint8_t syncWord        = CONFIG_LORA_SYNC_WORD;            ///< 1-byte LoRa sync word (0x12 = private, 0x34 = LoRaWAN)
-    // Node identity
-    uint16_t nodeId         = CONFIG_LORA_NODE_ID;              ///< This node's 16-bit network identifier
-    // FreeRTOS task knobs
-    uint32_t taskStackSize  = CONFIG_LORA_TASK_STACK_SIZE;      ///< Radio task stack size in bytes
-    uint32_t taskPriority   = CONFIG_LORA_TASK_PRIORITY;        ///< Radio task FreeRTOS priority
-    uint32_t txQueueDepth   = CONFIG_LORA_TX_QUEUE_DEPTH;       ///< Depth of the transmit queue (in TxItem units)
-    // Reliability knobs
-    uint32_t maxNeighbors   = CONFIG_LORA_MAX_NEIGHBORS;        ///< Maximum number of neighbour table entries
-    uint32_t maxRetries     = CONFIG_LORA_MAX_RETRIES;          ///< Maximum ACK retransmission attempts
-    uint32_t ackTimeoutMs   = CONFIG_LORA_ACK_TIMEOUT_MS;       ///< Timeout waiting for a link-layer ACK (ms)
-    uint32_t sleepIdleMs    = CONFIG_LORA_SLEEP_IDLE_MS;        ///< Idle time before entering modem sleep (ms)
-    uint32_t cadRetries     = CONFIG_LORA_CAD_RETRIES;          ///< Maximum CAD retries before dropping a packet
-};
-
-// ============================================================================
-// LoraRadio class
-// ============================================================================
-
-/**
- * @brief FreeRTOS-based LoRa link-layer driver.
- *
- * A single instance manages one SX1278 radio.  The public API is thread-safe;
- * all SPI work and state-machine logic run inside the dedicated radio task.
- *
- * @note Only one LoraRadio instance may exist at a time because the ISR
- *       trampolines (dio0Isr / dio1Isr) use a static singleton pointer.
- */
 class EspHal;  // forward-declare to avoid pulling all RadioLib headers in here
 
 class LoraRadio {
@@ -294,21 +196,9 @@ public:
 #endif
 
 private:
-    // -----------------------------------------------------------------------
-    // Internal packet container used by both TX queues
-    // -----------------------------------------------------------------------
-    static constexpr size_t MAX_FRAME_SIZE = PACKET_HEADER_SIZE + LORA_MAX_PAYLOAD;
+    using TxItem = LoraTxItem;
+    static constexpr size_t MAX_FRAME_SIZE = ::MAX_FRAME_SIZE;
 
-    struct TxItem {
-        uint8_t  buf[MAX_FRAME_SIZE];
-        uint16_t len;          ///< total frame bytes (header + payload)
-        uint8_t  retries;      ///< how many times this item has been retried
-        bool     needsAck;     ///< should we wait for an ACK?
-    };
-
-    // -----------------------------------------------------------------------
-    // Task-notification bit definitions
-    // -----------------------------------------------------------------------
     static constexpr uint32_t NOTIFY_DIO0      = (1u << 0);
     static constexpr uint32_t NOTIFY_DIO1      = (1u << 1);
     static constexpr uint32_t NOTIFY_TX_QUEUED = (1u << 2);
@@ -332,19 +222,21 @@ private:
     /// Shared initialisation called by both init() and initForTest().
     esp_err_t _initCommon(IRadioBackend* backend);
 
-    // Neighbour table management
-    void updateNeighbor(uint16_t nodeId, float rssi, float snr);
-
-    // Packet helpers
-    bool     dequeueNextTx(TxItem& out);
-    void     buildAck(uint8_t* frameBuf, uint16_t& frameLen,
-                      const PacketHeader& rxHdr);
-    void     dispatchRx(const uint8_t* frame, size_t len, float rssi, float snr);
+    bool dequeueNextTx(TxItem& out);
     uint32_t waitNotify(uint32_t timeoutMs);
+    void dispatchRx(const uint8_t* frame, size_t len, float rssi, float snr);
 
-    // -----------------------------------------------------------------------
-    // Data members
-    // -----------------------------------------------------------------------
+    bool handleIdle();
+    bool handleCad();
+    bool handleTxWait();
+    bool handleWaitAck();
+    bool handleRx();
+    bool handleSleeping();
+
+    using StateHandler = bool (LoraRadio::*)();
+    static constexpr size_t STATE_HANDLER_COUNT = 6;
+    static const StateHandler s_handlers[STATE_HANDLER_COUNT];
+
     LoraRadioConfig _cfg;
     State           _state  = State::IDLE;
     bool            _initialized = false;
@@ -395,14 +287,12 @@ private:
     // Rolling TX sequence counter
     uint8_t  _seqNum = 0;
 
-    // Pending ACK tracking
-    TxItem   _pendingAck{};
-    bool     _waitingAck = false;
-
     // CAD retry counter (reset each time a new packet enters CAD phase)
     uint8_t  _cadRetries = 0;
-
     // Currently staged TX item during CAD / TX_WAIT phases
     TxItem   _currentTx{};
     bool     _hasPendingTx = false;
+
+    NeighborTable _neighbors;
+    AckTracker _ackTracker;
 };

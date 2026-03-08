@@ -86,3 +86,4 @@ docs/doxygen/*
 docs/_build/
 
 _build/
+.vscode/settings.json
