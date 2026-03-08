@@ -1,0 +1,44 @@
+# Doxyfile for LoRa Link Layer
+
+PROJECT_NAME           = "LoRa Link Layer"
+PROJECT_BRIEF          = "FreeRTOS-based LoRa V2V/V2X link-layer driver for ESP32"
+
+OUTPUT_DIRECTORY       = build
+
+INPUT                  = ../components/lora_radio/include \
+                         mainpage.md
+RECURSIVE              = YES
+
+USE_MDFILE_AS_MAINPAGE = mainpage.md
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+
+HTML_EXTRA_STYLESHEET  = doxygen-awesome.css
+
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+HTML_COLORSTYLE        = AUTO_LIGHT
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+
+FILE_PATTERNS          = *.hpp *.h *.cpp *.md
+
+EXTENSION_MAPPING      = md=md
+
+SHOW_INCLUDE_FILES     = YES
+SORT_MEMBER_DOCS       = YES
+
+MACRO_EXPANSION        = NO
+PREDEFINED             =
+
+HAVE_DOT               = NO
