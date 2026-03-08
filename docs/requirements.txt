@@ -1,2 +1,0 @@
-esp-docs>=1.6.0
-breathe>=4.35.0
